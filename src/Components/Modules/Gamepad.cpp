@@ -4,6 +4,11 @@
 
 namespace Components
 {
+	Dvar::Var gpad_rx_value;
+	Dvar::Var gpad_ry_value;
+	Dvar::Var gpad_lx_value;
+	Dvar::Var gpad_ly_value;
+
 	Game::ButtonToCodeMap_t Gamepad::buttonList[]
 	{
 		{Game::GPAD_X, Game::K_BUTTON_X},
@@ -874,7 +879,7 @@ namespace Components
 	{
 		AssertIn(localClientNum, Game::MAX_GPAD_COUNT);
 
-		auto& gamePad = gamePads[localClientNum];
+		//auto& gamePad = gamePads[localClientNum];
 		auto& clientActive = Game::clients[localClientNum];
 
 		auto pitch = CL_GamepadAxisValue(localClientNum, Game::GPAD_VIRTAXIS_PITCH);
@@ -905,7 +910,7 @@ namespace Components
 		cmd->forwardmove = ClampChar(cmd->forwardmove + forwardMove);
 
 		// Swap attack and throw buttons when using controller and akimbo to match "left trigger"="left weapon" and "right trigger"="right weapon"
-		if (gamePad.inUse && clientActive.snap.ps.weapCommon.lastWeaponHand == Game::WEAPON_HAND_LEFT)
+		/*if (gamePad.inUse && clientActive.snap.ps.weapCommon.lastWeaponHand == Game::WEAPON_HAND_LEFT)
 		{
 			auto oldButtons = cmd->buttons;
 			if (oldButtons & Game::CMD_BUTTON_ATTACK)
@@ -925,7 +930,7 @@ namespace Components
 			{
 				cmd->buttons &= ~Game::CMD_BUTTON_ATTACK;
 			}
-		}
+		}*/
 
 		// Check for frozen controls. Flag name should start with PMF_
 		if (CG_ShouldUpdateViewAngles(localClientNum) && (clientActive.snap.ps.pm_flags & Game::PMF_FROZEN) == 0)
@@ -946,8 +951,11 @@ namespace Components
 			aimInput.rightAxis = side;
 			AimAssist_UpdateGamePadInput(&aimInput, &aimOutput);
 
-			cmd->meleeChargeDist = aimOutput.meleeChargeDist;
-			cmd->meleeChargeYaw = aimOutput.meleeChargeYaw;
+			if (aimOutput.meleeChargeDist > 0)
+			{
+				cmd->meleeChargeDist = aimOutput.meleeChargeDist;
+				cmd->meleeChargeYaw = aimOutput.meleeChargeYaw;
+			}
 
 			clientActive.clViewangles[0] = aimOutput.pitch;
 			clientActive.clViewangles[1] = aimOutput.yaw;
@@ -956,15 +964,15 @@ namespace Components
 
 	void Gamepad::CL_MouseMove(const int localClientNum, Game::usercmd_s* cmd, const float frametime_base)
 	{
-		auto& gamePad = gamePads[localClientNum];
-		if (!gamePad.inUse)
-		{
+		//auto& gamePad = gamePads[localClientNum];
+		//if (!gamePad.inUse)
+		//{
 			Game::CL_MouseMove(localClientNum, cmd, frametime_base);
-		}
-		else if (gpad_enabled.get<bool>() && gamePad.get_enabled())
-		{
+		//}
+		//else if (gpad_enabled.get<bool>() && gamePad.get_enabled())
+		//{
 			CL_GamepadMove(localClientNum, frametime_base, cmd);
-		}
+		//}
 	}
 
 	__declspec(naked) void Gamepad::CL_MouseMove_Stub()
@@ -1329,23 +1337,23 @@ namespace Components
 
 		for (auto localClientNum = 0; localClientNum < Game::MAX_GPAD_COUNT; ++localClientNum)
 		{
-			const auto& gamePad = gamePads[localClientNum];
+			//const auto& gamePad = gamePads[localClientNum];
 			std::lock_guard _(gamePadStateMutexes[localClientNum]);
 
-			if (!gamePad.get_enabled())
+			/*if (!gamePad.get_enabled())
 			{
 				continue;
-			}
+			}*/
 
 			if (!Gamepad::gpad_rumble.get<bool>())
 			{
 				gamePads[localClientNum].StopRumbles();
 			}
 
-			if (!gamePadDataReady[localClientNum])
-			{
+			//if (!gamePadDataReady[localClientNum])
+			//{
 				gamePads[localClientNum].UpdateState();
-			}
+			//}
 
 			gamePads[localClientNum].PushUpdates(); // We call them both together now because we update from another thread anyway
 
@@ -1372,8 +1380,8 @@ namespace Components
 
 	void Gamepad::IN_GamePadsMove()
 	{
-		if (!gpad_enabled.get<bool>())
-			return;
+		//if (!gpad_enabled.get<bool>())
+			//return;
 
 		const auto time = Game::Sys_Milliseconds();
 
@@ -1383,16 +1391,29 @@ namespace Components
 			auto& gamePad = gamePads[localClientNum];
 			std::lock_guard _(gamePadStateMutexes[localClientNum]);
 
-			if (!gamePad.get_enabled())
+			/*if (!gamePad.get_enabled())
 			{
 				continue;
-			}
+			}*/
 
 			gpadPresent = true;
-			const auto lx = gamePad.GetStick(Game::GPAD_LX);
-			const auto ly = gamePad.GetStick(Game::GPAD_LY);
-			const auto rx = gamePad.GetStick(Game::GPAD_RX);
-			const auto ry = gamePad.GetStick(Game::GPAD_RY);
+			auto lx = gpad_lx_value.get<float>();
+			auto ly = gpad_ly_value.get<float>();
+
+			auto rx = gpad_rx_value.get<float>();
+			auto ry = gpad_ry_value.get<float>();
+
+			/*if (ly != 0.f) {
+				lx *= (1.0f - 0.5f * std::fabs(ly));
+			}
+
+			if (ry != 0.f) {
+				rx *= (1.0f - 0.5f * std::fabs(ry));
+			}*/
+			//const auto lx = gamePad.GetStick(Game::GPAD_LX);
+			//const auto ly = gamePad.GetStick(Game::GPAD_LY);
+			//const auto rx = gamePad.GetStick(Game::GPAD_RX);
+			//const auto ry = gamePad.GetStick(Game::GPAD_RY);
 			const auto leftTrig = gamePad.GetButton(Game::GPAD_L_TRIG);
 			const auto rightTrig = gamePad.GetButton(Game::GPAD_R_TRIG);
 
@@ -1424,7 +1445,7 @@ namespace Components
 			gamePadDataReady[localClientNum] = false;
 		}
 
-		gpad_present.setRaw(gpadPresent);
+		//gpad_present.setRaw(gpadPresent);
 	}
 
 	void Gamepad::IN_Frame_Hk()
@@ -1617,9 +1638,9 @@ namespace Components
 
 	void Gamepad::InitDvars()
 	{
-		gpad_enabled = Dvar::Register<bool>("gpad_enabled", false, Game::DVAR_ARCHIVE, "Game pad enabled");
-		gpad_present = Dvar::Register<bool>("gpad_present", false, Game::DVAR_ROM, "Game pad present");
-		gpad_in_use = Dvar::Register<bool>("gpad_in_use", false, Game::DVAR_ROM, "A game pad is in use");
+		gpad_enabled = Dvar::Register<bool>("gpad_enabled", true, Game::DVAR_ARCHIVE, "Game pad enabled");
+		gpad_present = Dvar::Register<bool>("gpad_present", true, Game::DVAR_ROM, "Game pad present");
+		gpad_in_use = Dvar::Register<bool>("gpad_in_use", true, Game::DVAR_ROM, "A game pad is in use");
 		gpad_style = Dvar::Register<bool>("gpad_style", false, Game::DVAR_ARCHIVE, "Switch between Xbox and PS HUD");
 		gpad_sticksConfig = Dvar::Register<const char*>("gpad_sticksConfig", "", Game::DVAR_ARCHIVE, "Game pad stick configuration");
 		gpad_buttonConfig = Dvar::Register<const char*>("gpad_buttonConfig", "", Game::DVAR_ARCHIVE, "Game pad button configuration");
@@ -1691,8 +1712,8 @@ namespace Components
 		(*keys)[0] = -1;
 		(*keys)[1] = -1;
 
-		if (gamePads[localClientNum].inUse)
-		{
+		//if (gamePads[localClientNum].inUse)
+		//{
 			const auto gamePadCmd = GetGamePadCommand(cmd);
 			for (auto keyNum = 0; keyNum < Game::K_LAST_KEY; keyNum++)
 			{
@@ -1711,8 +1732,8 @@ namespace Components
 					}
 				}
 			}
-		}
-		else
+		//}
+		/*else
 		{
 			for (auto keyNum = 0; keyNum < Game::K_LAST_KEY; keyNum++)
 			{
@@ -1731,7 +1752,7 @@ namespace Components
 					}
 				}
 			}
-		}
+		}*/
 
 		return keyCount;
 	}
@@ -1770,8 +1791,8 @@ namespace Components
 	void Gamepad::CL_KeyEvent_Hk(const int localClientNum, const int key, const int down, const unsigned time)
 	{
 		// A keyboard key has been pressed. Mark controller as unused.
-		gamePads[localClientNum].inUse = false;
-		gpad_in_use.setRaw(false);
+		//gamePads[localClientNum].inUse = false;
+		//gpad_in_use.setRaw(false);
 
 		// Call original function
 		Utils::Hook::Call<void(int, int, int, unsigned)>(0x4F6480)(localClientNum, key, down, time);
@@ -1779,15 +1800,15 @@ namespace Components
 
 	bool Gamepad::IsGamePadInUse()
 	{
-		return gamePads[0].inUse;
+		return true;
 	}
 
 	void Gamepad::OnMouseMove([[maybe_unused]] const int x, [[maybe_unused]] const int y, const int dx, const int dy)
 	{
 		if (dx != 0 || dy != 0)
 		{
-			gamePads[0].inUse = false;
-			gpad_in_use.setRaw(false);
+			/*gamePads[0].inUse = false;
+			gpad_in_use.setRaw(false);*/
 		}
 	}
 
@@ -1801,7 +1822,7 @@ namespace Components
 
 	bool Gamepad::UI_RefreshViewport_Hk()
 	{
-		return cl_bypassMouseInput.get<bool>() || IsGamePadInUse();
+		return cl_bypassMouseInput.get<bool>();
 	}
 
 	Game::keyname_t* Gamepad::GetLocalizedKeyNameMap()
@@ -2015,6 +2036,11 @@ namespace Components
 		{
 			return;
 		}
+
+		gpad_rx_value = Dvar::Register<float>("gpad_rx_value", 0.0f, -1.0f, 1.0f, Game::DVAR_NONE, "");
+		gpad_ry_value = Dvar::Register<float>("gpad_ry_value", 0.0f, -1.0f, 1.0f, Game::DVAR_NONE, "");
+		gpad_lx_value = Dvar::Register<float>("gpad_lx_value", 0.0f, -1.0f, 1.0f, Game::DVAR_NONE, "");
+		gpad_ly_value = Dvar::Register<float>("gpad_ly_value", 0.0f, -1.0f, 1.0f, Game::DVAR_NONE, "");
 
 		// Initialize gamepad environment
 		Utils::Hook(0x4059FE, CG_RegisterDvars_Hk, HOOK_CALL).install()->quick();

@@ -3,6 +3,7 @@
 #include "Chat.hpp"
 #include "Events.hpp"
 #include "Voice.hpp"
+#include "GSC/Script.hpp"
 
 namespace Components
 {
@@ -13,6 +14,7 @@ namespace Components
 	bool Voice::S_PlayerMute[Game::MAX_CLIENTS];
 
 	const Game::dvar_t* Voice::sv_voice;
+	std::map<int, bool> force_client_voice;
 
 	bool Voice::SV_VoiceEnabled()
 	{
@@ -282,6 +284,10 @@ namespace Components
 
 	bool Voice::CL_IsPlayerTalking_Hk([[maybe_unused]] Game::SessionData* session, [[maybe_unused]] const int localClientNum, const int talkingClientIndex)
 	{
+		if (force_client_voice.contains(talkingClientIndex))
+		{
+			return force_client_voice.at(talkingClientIndex);
+		}
 		// Skip all the Party related code
 		return Game::Voice_IsClientTalking(talkingClientIndex);
 	}
@@ -384,6 +390,12 @@ namespace Components
 
 	Voice::Voice()
 	{
+		GSC::Script::AddMethod("force_voice", [](Game::scr_entref_t entref) // gsc: self rename_player(name);
+			{
+				auto boolvalue = Game::Scr_GetInt(0);
+				force_client_voice[entref.entnum] = boolvalue == 1 ? true : false;
+			});
+
 		AssertOffset(Game::clientUIActive_t, connectionState, 0x9B8);
 
 		std::memset(VoicePackets, 0, sizeof(VoicePackets));
@@ -395,12 +407,12 @@ namespace Components
 		Events::OnSteamDisconnect(CL_ClearMutedList);
 		Events::OnClientDisconnect(SV_UnmuteClient);
 		Events::OnClientConnect([](const Game::client_s* cl) -> void
-		{
-			if (Chat::IsMuted(cl))
 			{
-				SV_MuteClient(cl - Game::svs_clients);
-			}
-		});
+				if (Chat::IsMuted(cl))
+				{
+					SV_MuteClient(cl - Game::svs_clients);
+				}
+			});
 
 		// Write voice packets to the server instead of other clients
 		Utils::Hook(0x487935, CL_WriteVoicePacket_Hk, HOOK_CALL).install()->quick();

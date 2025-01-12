@@ -191,6 +191,7 @@ namespace Components
 		Register(new Zones());
 
 		Register(new GSC::GSC());
+		Register(new Mirele::Mirele());
 
 		Register(new BotLib::lPrecomp());
 

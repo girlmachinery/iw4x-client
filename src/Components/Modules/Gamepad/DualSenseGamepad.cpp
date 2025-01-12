@@ -199,7 +199,7 @@ bool Components::GamepadControls::DualSenseGamePadAPI::Fetch()
 		}
 	}
 
-	return false;
+	return true;
 }
 
 void Components::GamepadControls::DualSenseGamePadAPI::ReadSticks(Game::vec2_t& leftStick, Game::vec2_t& rightStick)

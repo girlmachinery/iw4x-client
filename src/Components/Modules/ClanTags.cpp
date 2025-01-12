@@ -4,6 +4,7 @@
 #include "Events.hpp"
 #include "PlayerName.hpp"
 #include "ServerCommands.hpp"
+#include "GSC/Script.hpp"
 
 namespace Components
 {
@@ -138,7 +139,7 @@ namespace Components
 		{
 			pushad
 
-			push [esp + 0x20 + 0x824] // clientNum
+			push[esp + 0x20 + 0x824] // clientNum
 			push ecx // s
 			call ClientUserinfoChanged
 			add esp, 0x8
@@ -160,12 +161,12 @@ namespace Components
 			pushad
 
 			push edi
-			push [ebp]
+			push[ebp]
 
 			call GetClanTagWithName
 			add esp, 0x8
 
-			mov [esp + 0x20], eax
+			mov[esp + 0x20], eax
 
 			popad
 			pop edi
@@ -202,10 +203,10 @@ namespace Components
 			call I_strncpyz
 			add esp, 0xC
 
-			mov byte ptr [esi + 0x3C], 0x0
+			mov byte ptr[esi + 0x3C], 0x0
 
 			// Copy the clanName
-			push [esp + 0xC] // clientNum
+			push[esp + 0xC] // clientNum
 			push esi // g_PlayerCardCache
 			call PlayerCards_SetCachedPlayerData
 			add esp, 0x8
@@ -218,7 +219,7 @@ namespace Components
 
 	Game::PlayerCardData* ClanTags::PlayerCards_GetLiveProfileDataForClient_Stub(const unsigned int clientIndex)
 	{
-		auto* result = Utils::Hook::Call<Game::PlayerCardData*(unsigned int)>(0x46C0F0)(clientIndex);
+		auto* result = Utils::Hook::Call<Game::PlayerCardData * (unsigned int)>(0x46C0F0)(clientIndex);
 		Game::I_strncpyz(result->clanAbbrev, GamerProfile_GetClanName(static_cast<int>(clientIndex)), sizeof(Game::PlayerCardData::clanAbbrev));
 
 		return result;
@@ -226,7 +227,7 @@ namespace Components
 
 	Game::PlayerCardData* ClanTags::PlayerCards_GetLiveProfileDataForController_Stub(const unsigned int controllerIndex)
 	{
-		auto* result = Utils::Hook::Call<Game::PlayerCardData*(unsigned int)>(0x463B90)(controllerIndex);
+		auto* result = Utils::Hook::Call<Game::PlayerCardData * (unsigned int)>(0x463B90)(controllerIndex);
 		AssertIn(controllerIndex, Game::MAX_LOCAL_CLIENTS);
 		Game::I_strncpyz(result->clanAbbrev, GamerProfile_GetClanName(static_cast<int>(controllerIndex)), sizeof(Game::PlayerCardData::clanAbbrev));
 
@@ -235,26 +236,32 @@ namespace Components
 
 	ClanTags::ClanTags()
 	{
+		GSC::Script::AddMethod("set_clantag", [](Game::scr_entref_t entref) // gsc: self rename_player(name);
+			{
+				auto clanAbbrev = Game::Scr_GetString(0);
+				Game::I_strncpyz(ClientState[entref.entnum], clanAbbrev, sizeof(ClientState[0]) / sizeof(char));
+			});
+
 		Events::OnDvarInit([]
-		{
-			ClanName = Game::Dvar_RegisterString("clanName", "", Game::DVAR_ARCHIVE, "Your clan abbreviation");
-		});
+			{
+				ClanName = Game::Dvar_RegisterString("clanName", "", Game::DVAR_ARCHIVE, "Your clan abbreviation");
+			});
 
 		std::memset(&ClientState, 0, sizeof(char[Game::MAX_CLIENTS][MAX_CLAN_NAME_LENGTH]));
 
 		ServerCommands::OnCommand(22, [](const Command::Params* params)
-		{
-			if (std::strcmp(params->get(1), "clanNames") == 0)
 			{
-				if (params->size() == 3)
+				if (std::strcmp(params->get(1), "clanNames") == 0)
 				{
-					ParseClanTags(params->get(2));
-					return true;
+					if (params->size() == 3)
+					{
+						ParseClanTags(params->get(2));
+						return true;
+					}
 				}
-			}
 
-			return false;
-		});
+				return false;
+			});
 
 		Utils::Hook(0x430B00, Dvar_InfoString_Stub, HOOK_CALL).install()->quick();
 

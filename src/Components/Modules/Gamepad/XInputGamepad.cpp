@@ -34,7 +34,7 @@ namespace Components::GamepadControls
 			return true;
 		}
 
-		return false;
+		return true;
 	}
 
 	void XInputGamePadAPI::ReadSticks(Game::vec2_t& leftStick, Game::vec2_t& rightStick)

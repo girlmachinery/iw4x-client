@@ -9,6 +9,10 @@ namespace Components::GSC
 {
 	std::unordered_map<const char*, const char*> ScriptExtension::ReplacedFunctions;
 	const char* ScriptExtension::ReplacedPos = nullptr;
+	nlohmann::json data;
+
+	typedef void(*FireWeapon_t)(Game::gentity_s* ent, int gametime, int shotCount);
+	FireWeapon_t FireWeapon = FireWeapon_t(0x4A4D50);
 
 	const char* ScriptExtension::GetCodePosForParam(int index)
 	{
@@ -175,6 +179,135 @@ namespace Components::GSC
 
 				Logger::Print(Game::level->scriptPrintChannel, "{}", str);
 			}
+		});
+
+		Script::AddFunction("DataFileExists", []
+		{
+			Game::Scr_AddBool(Utils::IO::FileExists("data.json"));
+		});
+
+		Script::AddFunction("ReadDataFile", []
+		{
+			data = nlohmann::json::parse(Utils::IO::ReadFile("data.json"));
+		});
+
+		Script::AddFunction("WriteDataFile", []
+		{
+			Utils::IO::WriteFile("data.json", data.dump(4));
+		});
+
+		Script::AddFunction("SetDataValue", []
+		{
+			std::string playerName = Game::Scr_GetString(0);
+			std::string key = Game::Scr_GetString(1);
+			std::string value = Game::Scr_GetString(2);
+
+			data[playerName][key] = value;
+		});
+
+		Script::AddFunction("DataHasValue", []
+		{
+			std::string playerName = Game::Scr_GetString(0);
+			std::string key = Game::Scr_GetString(1);
+
+			Game::Scr_AddBool(data.contains(playerName) && data[playerName].contains(key));
+		});
+
+		Script::AddFunction("GetDataValue", []
+		{
+			std::string playerName = Game::Scr_GetString(0);
+			std::string key = Game::Scr_GetString(1);
+
+			if (data.contains(playerName) && data[playerName].contains(key))
+			{
+				Game::Scr_AddString(data[playerName][key].get<std::string>().data());
+			}
+			else
+			{
+				Game::Scr_AddString("NO VALUE");
+			}
+		});
+
+		Script::AddMethod("fire_weapon", [](Game::scr_entref_t entref)
+		{
+			FireWeapon(&Game::g_entities[entref.entnum], 1, 55);
+		});
+
+		Script::AddMethod("InstaShoot", [](Game::scr_entref_t entref)
+		{
+			auto* ent = Script::Scr_GetPlayerEntity(entref);
+			if (!ent)
+				return;
+
+			for (int hand = 0; hand < 2; hand++)
+			{
+				ent->client->ps.weapState[hand].weaponState = 0;
+				ent->client->ps.weapState[hand].weaponTime = 0;
+				ent->client->ps.weapState[hand].weaponDelay = 0;
+			}
+		});
+
+		Script::AddMethod("SmoothAction", [](Game::scr_entref_t entref)
+		{
+			auto* ent = Script::Scr_GetPlayerEntity(entref);
+			if (!ent)
+				return;
+
+			for (int hand = 0; hand < 2; hand++)
+			{
+				ent->client->ps.weapState[hand].weaponState = 0;
+				ent->client->ps.weapState[hand].weaponTime = 0;
+				ent->client->ps.weapState[hand].weaponDelay = 0;
+				ent->client->ps.weapState[hand].weapAnim = 1;
+			}
+		});
+
+		Script::AddMethod("SetWeaponAnimation", [](Game::scr_entref_t entref)
+		{
+			auto* ent = Script::Scr_GetPlayerEntity(entref);
+			if (!ent)
+				return;
+
+			int anim = Game::Scr_GetInt(0);
+			std::string hand = Game::Scr_GetString(1);
+
+			if (hand == "both")
+			{
+				for (int i = 0; i < 2; i++)
+				{
+					ent->client->ps.weapState[i].weapAnim = anim;
+				}
+			}
+			else if (hand == "left")
+			{
+				ent->client->ps.weapState[1].weapAnim = anim;
+			}
+			else if (hand == "right")
+			{
+				ent->client->ps.weapState[0].weapAnim = anim;
+			}
+		});
+
+		Script::AddMethod("set_gunlock", [](Game::scr_entref_t entref)
+		{
+			auto* ent = Script::Scr_GetPlayerEntity(entref);
+			if (!ent)
+				return;
+
+			std::string weapon = Game::Scr_GetString(0);
+			int model = Game::Scr_GetInt(1);
+			auto* state = Game::BG_GetEquippedWeaponState(&ent->client->ps, Game::G_GetWeaponIndexForName(weapon.data()));
+			if (state != nullptr)
+			{
+				state->weaponModel = (char)model;
+			}
+		});
+
+		Script::AddMethod("rename_player", [](Game::scr_entref_t entref) // gsc: self rename_player(name);
+		{
+			auto stringValue = Game::Scr_GetString(0);
+			strcpy(Game::g_entities[entref.entnum].client->sess.cs.name, stringValue);
+			strcpy(Game::g_entities[entref.entnum].client->sess.newnetname, stringValue);
 		});
 	}
 
